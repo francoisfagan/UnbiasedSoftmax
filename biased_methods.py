@@ -69,6 +69,30 @@ def importance_gradient(X,y,w,q,n_samples):
 	return X[y] - vec.dot(X[indices])/np.sum(vec)
 
 
+def importance_gradient_deterministic(X,y,w,q,n_samples):
+	"""
+	Calculate the softmax gradient using the importance sampling method deterministically.
+	This differs from the importance_gradient method in that the indices are not random, but the top n_samples
+	The benefit is that this avoids the need for random sampling (slowing down the algorithm)
+	and also should decrease the variance as the most important classes are always evaluated
+	Input:
+		X,y,w:		As for the exact_gradient function
+		q:			Sampling probabilities of the indices. q[i] = Prob(y=i)
+		n_samples:	Number of indices to sample
+
+	Output:
+		Importance sampling estimate for the gradient of the softmax
+
+	To test whether this function works as intended, check its gradients vs the true gradient:
+	rep = 10**2
+	print "Importance sample estimate: %s" %str(np.mean([importance_gradient(X,y,w,q,n_samples) for _ in xrange(rep)],axis=0))
+	print "Exact: %s" % str(exact_gradient(X,y,w))
+	"""
+	vec = np.exp(X[:n_samples].dot(w))
+	#pdb.set_trace()
+	return X[y] - vec.dot(X[:n_samples])/np.sum(vec)#*np.sum(q[:n_samples])
+
+
 def one_vs_each_gradient(X,y,w,q_without_y,n_samples):
 	"""
 	Calculate the softmax gradient using the importance sampling method
@@ -92,39 +116,55 @@ def one_vs_each_gradient(X,y,w,q_without_y,n_samples):
 	K = X.shape[0]
 	assert(q_without_y[y]==0.0)
 	indices = choice(range(K), n_samples, p = q_without_y)
-	return (1/(1+np.exp(X[y].dot(w))-X[indices].dot(w))).dot(X[y]-X[indices]) 
+	#pdb.set_trace()
+	ret = np.multiply( 1/(1+np.exp(X[y].dot(w)-X[indices].dot(w)) ) , 1.0/q_without_y[indices] ).dot(X[y]-X[indices]) / n_samples
+	return ret
 
 
 def gradual_gradient(X,y,w,q,p,base):
-	# base = np.ceil(W_p* (1-1/(2*p)) ) 
-	# The base number of samples in the geometric sequence so the average number of samples is W_p
+	"""
+	Calculate the softmax gradient using the importance sampling method
+	Input:
+		X,y,w,q:		As for the importance_gradient function.
+						Note that q should be ordered as a decreasing sequence for low variance (but will work either way)
+		p:				Geometric parameter
+		base:			Number of samples for the base: R_1.
+						base = np.ceil(W_p* (1-1/(2*p)) ) ensures that the expected number of samples is W_p 
+
+
+	Output:
+		Gradual gradient sampling estimate for the gradient of the softmax
+
+	To test whether this function works as intended, check its gradients vs the true gradient:
+	rep = 10**2
+	print "Gradual sample estimate: %s" %str(np.mean([gradual_gradient(X,y,w,q,p,base) for _ in xrange(rep)],axis=0))
+	print "Exact: %s" % str(exact_gradient(X,y,w))
+	"""
+	# base = 
+	# 
 	# Note this calculation is approximate and is only accurate for large K
 	
 	K = X.shape[0]
-
 	# Maximum value of the geometric random variable
 	J_max = np.ceil(np.log2(K/base))
-	
 	# Sample from truncated geometric distribution with weter p
 	J = truncated_geometric_sample(p,J_max)
-
 	# Calculate dot products to be used in the estimate R and also for gradient steps
-	partial_dot_1 = np.exp(X[:base].dot(w))
-	partial_dot_2 = np.exp(X[base: min(base*2**(J-1) , K) ].dot(w))
-	partial_dot_3 = np.exp(X[min(base*2**(J-1) , K) : min(base*2**J , K) ].dot(w))
-
-	# Calculate approx denomenator
-	partial_sum_1 = np.sum(partial_dot_1)
-	partial_sum_2 = partial_sum_1 + np.sum(partial_dot_2)
-	partial_sum_3 = partial_sum_2 + np.sum(partial_dot_3)
-
-	R = (base/partial_sum_1 
-		+ (min(base*2**J , K)/partial_sum_3	- min(base*2**(J-1) , K)/partial_sum_2 ) 
-		/ truncated_geometric_pmf(p,J_max,J) ) / K
-
+	range_base = range(base)
+	range_J_minus = range(int(min(base*2**(J-1) , K)) )
+	range_J = range(int(min(base*2**J , K)) )
+	# Calculate dot products between X and w
+	dot_base = np.exp(X[range_base].dot(w))
+	dot_J_minus = np.exp(X[range_J_minus].dot(w))
+	dot_J = np.exp(X[range_J].dot(w))
+	# Calculate R_base, R_J_minus and R_J
+	R_base = dot_base.dot(X[range_base]) / sum(dot_base)#sum(q[range_base]) * 
+	R_J_minus = dot_J_minus.dot(X[range_J_minus]) / sum(dot_J_minus)#sum(q[range_J_minus]) * 
+	R_J = dot_J.dot(X[range_J]) / sum(dot_J)#sum(q[range_J]) * 
+	# Calculate R
+	R = R_base + (R_J - R_J_minus ) / truncated_geometric_pmf(p,J_max,J)
 	# Return softmax approximation
-	#vec = 
-	return X[y] - R*np.exp(X.dot(w)).dot(X)
+	return X[y] - R
 
 
 
@@ -144,6 +184,26 @@ def unbiased_importance_gradient(X,y,w,q,n_samples,p_2):
 	print "Exact: %s" % str(exact_gradient(X,y,w))
 	"""
 	R = importance_gradient(X,y,w,q,n_samples)
+	if random() > p_2 :  return R
+	else : return (exact_gradient(X,y,w) - (1-p_2)*R)/p_2
+
+
+def unbiased_importance_gradient_deterministic(X,y,w,q,n_samples,p_2):
+	"""
+	Calculate the softmax gradient using the deterministic importance sampling method
+	Input:
+		X,y,w,q, n_samples:		As for the importance_gradient function
+		p_2:					Probability of sampling exact gradient
+
+	Output:
+		Unbiased deterministic importance sampling estimate for the gradient of the softmax
+
+	To test whether this function works as intended, check its gradients vs the true gradient:
+	rep = 10**5
+	print "Unbiased deterministic importance sample estimate: %s" %str(np.mean([unbiased_importance_gradient_deterministic(X,y,w,q,n_samples,p_2) for _ in xrange(rep)],axis=0))
+	print "Exact: %s" % str(exact_gradient(X,y,w))
+	"""
+	R = importance_gradient_deterministic(X,y,w,q,n_samples)
 	if random() > p_2 :  return R
 	else : return (exact_gradient(X,y,w) - (1-p_2)*R)/p_2
 
@@ -171,8 +231,4 @@ def unbiased_one_vs_each_gradient(X,y,w,q_without_y,n_samples,p_2):
 	R = one_vs_each_gradient(X,y,w,q_without_y,n_samples)
 	if random() > p_2 :  return R
 	else : return (exact_gradient(X,y,w) - (1-p_2)*R)/p_2
-
-
-
-
 
