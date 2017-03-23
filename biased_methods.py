@@ -6,6 +6,10 @@ import numpy as np
 from numpy.random import random, choice
 import pdb
 
+def sigma(x):
+	# The binary logistic loss function
+	return 1.0/(1+np.exp(-x))
+
 def truncated_geometric_pmf(p,trunc,j):
 	# PMF of geometric variable with values in 1,...,trunc
 	return p*(1- p)**(j-1) / (1-(1- p)**trunc)
@@ -47,7 +51,7 @@ def exact_gradient(X,y,w):
 	return X[y] - vec.dot(X)/np.sum(vec)
 
 
-def importance_gradient(X,y,w,q,n_samples):
+def importance_gradient(X,y,w,q,n_samples=100):
 	"""
 	Calculate the softmax gradient using the importance sampling method
 	Input:
@@ -69,7 +73,7 @@ def importance_gradient(X,y,w,q,n_samples):
 	return X[y] - vec.dot(X[indices])/np.sum(vec)
 
 
-def importance_gradient_deterministic(X,y,w,q,n_samples):
+def importance_gradient_deterministic(X,y,w,q,n_samples=100):
 	"""
 	Calculate the softmax gradient using the importance sampling method deterministically.
 	This differs from the importance_gradient method in that the indices are not random, but the top n_samples
@@ -93,7 +97,7 @@ def importance_gradient_deterministic(X,y,w,q,n_samples):
 	return X[y] - vec.dot(X[:n_samples])/np.sum(vec)#*np.sum(q[:n_samples])
 
 
-def one_vs_each_gradient(X,y,w,q_without_y,n_samples):
+def one_vs_each_gradient(X,y,w,q_without_y,n_samples=5):
 	"""
 	Calculate the softmax gradient using the importance sampling method
 	Input:
@@ -114,11 +118,34 @@ def one_vs_each_gradient(X,y,w,q_without_y,n_samples):
 	print "Exact: %s" % str(exact_gradient(X,y,w))
 	"""
 	K = X.shape[0]
-	assert(q_without_y[y]==0.0)
-	indices = choice(range(K), n_samples, p = q_without_y)
-	#pdb.set_trace()
-	ret = np.multiply( 1/(1+np.exp(X[y].dot(w)-X[indices].dot(w)) ) , 1.0/q_without_y[indices] ).dot(X[y]-X[indices]) / n_samples
+	#assert(q_without_y[y]==0.0)
+	# Correct way: indices = choice(range(K), n_samples, p = q_without_y)
+	# Correct way: ret = np.multiply( sigma( X[y].dot(w)-X[indices].dot(w) ) , 1.0/q_without_y[indices] ).dot(X[y]-X[indices]) / n_samples
+	ret = sigma( X[y].dot(w)-X[:n_samples].dot(w) ).dot(X[y]-X[:n_samples])
 	return ret
+
+
+def negative_sampling_gradient(X,y,w,q,n_samples=5):
+	"""
+	Calculate the softmax gradient using the importance sampling method
+	Input:
+		X,y,w:		As for the exact_gradient function
+		q:			Sampling probabilities of the indices. q[i] = Prob(y=i)
+		n_samples:	Number of indices to sample
+
+	Output:
+		Negative sampling estimate for the gradient of the softmax
+
+	To test whether this function works as intended, check its gradients vs the true gradient:
+	rep = 10**2
+	print "Negative sample estimate: %s" %str(np.mean([negative_sampling_gradient(X,y,w,q) for _ in xrange(rep)],axis=0))
+	print "Exact: %s" % str(exact_gradient(X,y,w))
+	"""
+	K = X.shape[0]
+	indices = range(n_samples)#choice(range(K), n_samples, p = q)
+	vec = sigma(X[indices].dot(w)) #/ n_samples * K #/ q[indices]
+	return sigma(-X[y].dot(w))*X[y] - vec.dot(X[indices])
+	
 
 
 def gradual_gradient(X,y,w,q,p,base):
@@ -168,7 +195,7 @@ def gradual_gradient(X,y,w,q,p,base):
 
 
 
-def unbiased_importance_gradient(X,y,w,q,n_samples,p_2):
+def unbiased_importance_gradient(X,y,w,q,p_2,n_samples=100):
 	"""
 	Calculate the softmax gradient using the importance sampling method
 	Input:
@@ -188,7 +215,7 @@ def unbiased_importance_gradient(X,y,w,q,n_samples,p_2):
 	else : return (exact_gradient(X,y,w) - (1-p_2)*R)/p_2
 
 
-def unbiased_importance_gradient_deterministic(X,y,w,q,n_samples,p_2):
+def unbiased_importance_gradient_deterministic(X,y,w,q,p_2,n_samples=100):
 	"""
 	Calculate the softmax gradient using the deterministic importance sampling method
 	Input:
@@ -209,8 +236,29 @@ def unbiased_importance_gradient_deterministic(X,y,w,q,n_samples,p_2):
 
 
 
+def unbiased_negative_sampling_gradient(X,y,w,q,p_2,n_samples=5):
+	"""
+	Calculate the softmax gradient using the importance sampling method
+	Input:
+		X,y,w,q, n_samples:		As for the importance_gradient function
+		p_2:					Probability of sampling exact gradient
 
-def unbiased_one_vs_each_gradient(X,y,w,q_without_y,n_samples,p_2):
+	Output:
+		Unbiased importance sampling estimate for the gradient of the softmax
+
+	To test whether this function works as intended, check its gradients vs the true gradient:
+	rep = 10**5
+	print "Unbiased importance sample estimate: %s" %str(np.mean([unbiased_negative_sampling_gradient(X,y,w,q,p_2) for _ in xrange(rep)],axis=0))
+	print "Exact: %s" % str(exact_gradient(X,y,w))
+	"""
+	R = negative_sampling_gradient(X,y,w,q,n_samples)
+	if random() > p_2 :  return R
+	else : return (exact_gradient(X,y,w) - (1-p_2)*R)/p_2
+
+
+
+
+def unbiased_one_vs_each_gradient(X,y,w,q_without_y,p_2,n_samples=5):
 	"""
 	Calculate the softmax gradient using the importance sampling method
 	Input:
