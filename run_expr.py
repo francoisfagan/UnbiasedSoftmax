@@ -11,7 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from random import randint
 from sklearn import linear_model
-from Dgradients import *
+from unbiased_gradients import *
 
 def readHyperParameters():
 	data_path = "simulated_data_K_3_dim_2_n_datapoints_100000"
