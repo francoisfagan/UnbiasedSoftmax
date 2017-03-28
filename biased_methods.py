@@ -145,7 +145,7 @@ def multilevel(X,y,w,W_p,p = 1-2**(-3.0/2)):
 
 	To test whether this function works as intended, check its gradients vs the true gradient:
 	rep = 10**2
-	print "Gradual sample estimate: %s" %str(np.mean([multilevel2(X,y,w,W_p) for _ in xrange(rep)],axis=0))
+	print "Gradual sample estimate: %s" %str(np.mean([multilevel(X,y,w,W_p) for _ in xrange(rep)],axis=0))
 	print "Exact: %s" % str(exact(X,y,w))
 	"""
 	# Note this calculation is approximate and is only accurate for large K

@@ -12,12 +12,12 @@ from biased_methods import *
 if __name__ == "__main__":
 
     # General Hyperparameters
-    K = 10**5
+    K = 10**6
     scale = 1
     dim = 20
     examples = 100
     repetitions = 10**2
-    work_frac = 0.01
+    work_frac = 0.001
 
     W_p = int(K*work_frac)                      # Work per iteration
     assert(W_p>100)                             # So the importance sampling p_2 is valid
