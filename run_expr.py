@@ -12,17 +12,20 @@ import matplotlib.pyplot as plt
 from random import randint
 from sklearn import linear_model
 from unbiased_gradients import *
+import pickle
+import os
 
 def readHyperParameters():
-	data_path = "simulated_data_K_3_dim_2_n_datapoints_100000"
+	data_path = "Data/Simulated/simulated_data_K_100_dim_2_n_datapoints_100000"
 
 	hyper_param = 0
-	repetitions = 1
-	work_total = 10*3
-	eval_delay = 10
-	work_frac = 0.9
+	repetitions = 10
+	time_total = 10**5
+	n_eval_loss = 10
+	NS_n = 5
+	OVE_n = 5
 
-	return [data_path , hyper_param , repetitions , work_total, work_frac, eval_delay]
+	return [data_path , hyper_param , repetitions , time_total, n_eval_loss, NS_n, OVE_n]
 	# # Load hyperparameters from the terminal
  #    if len(sys.argv) > 1:
  #        data_set = sys.argv[1]
@@ -44,18 +47,21 @@ def readHyperParameters():
  #        exit(0)
 
 
+	# Plot figures
+
+
 class Solver:
 
-	def __init__(self, data_path, hyper_param, repetitions=1, work_total=100, work_frac=0.1, n_eval_loss=10):
+	def __init__(self, data_path, hyper_param, repetitions, time_total, n_eval_loss, NS_n, OVE_n):
 
 		# Set hyperparameters
 		self.hyper_param = hyper_param
 		self.repetitions = repetitions
-		self.work_total = work_total
-		self.work_frac = work_frac
+		self.time_total = time_total
 		self.n_eval_loss = n_eval_loss
 
 		# Load training and test data
+		self.data_path = data_path
 		train_data = np.genfromtxt(data_path + "_train.csv", delimiter=',')
 		test_data = np.genfromtxt(data_path + "_test.csv", delimiter=',')
 
@@ -75,63 +81,98 @@ class Solver:
 		# self.q = np.array([1.0/self.K]*self.K)
 
 		# Set algorithm constants
-		self.NS_n = 2
-		self.OVE_n = 2
+		self.NS_n = NS_n
+		self.OVE_n = OVE_n
+
+		# store results of running methods
+		self.method_scores = {}
 
 	def score(self,W):
 		return np.mean(np.argmax(W.dot(self.X_test.T),axis=0)==self.Y_test)
 		
-
 	def scikit_learn(self):
 		logreg = linear_model.LogisticRegression(C=1e5,solver ='newton-cg',multi_class='multinomial',fit_intercept=False)
 		logreg.fit(self.X_train, self.Y_train)
 		print np.mean(logreg.predict(self.X_test)==self.Y_test)
 		
-
-	def fit(self, name):
-		print(name)
-		if name == 'scikit_learn':
+	def fit(self, method):
+		print(method)
+		if method == 'scikit_learn':
 			self.scikit_learn()
-		else:
-			max_iter = self.work_total
-			#W_history = np.zeros(self.repetitions , (self.K,self.dim) , max_iter/self.n_eval_loss )
+			return
 
-			for repeat in range(repetitions):
-				print(repeat)
-				W = np.zeros((self.K,self.dim))
-				for i in xrange(0,max_iter):
-					data_index = randint(0,self.n_samples_train-1)
-					#pdb.set_trace()
-					#eval(name + "(self.X_train[data_index],self.Y_train[data_index],W,work_frac)")
-					if name == 'exact':
-						grad_indices , grad = exact(self.X_train[data_index],self.Y_train[data_index],W)
-					elif name == 'NS':
-						grad_indices , grad = NS(self.X_train[data_index],self.Y_train[data_index],W,self.NS_n)
-					elif name == 'OVE':
-						grad_indices , grad = OVE(self.X_train[data_index],self.Y_train[data_index],W,self.OVE_n)
-					elif name == 'DNS':
-						grad_indices , grad = DNS(self.X_train[data_index],self.Y_train[data_index],W,self.work_frac,self.NS_n)
-					elif name == 'DOVE':
-						grad_indices , grad = DOVE(self.X_train[data_index],self.Y_train[data_index],W,self.work_frac,self.OVE_n)
-					else:
-						print('Error, not a valid method. Check the method name.')
+		if method 		== 'EXACT':		gradient_calculator = EXACT()
+		elif method 	== 'NS':		gradient_calculator = NS(self.NS_n)
+		elif method 	== 'OVE':		gradient_calculator = OVE(self.OVE_n)
+		elif method 	== 'DNS':		gradient_calculator = DNS(self.NS_n, self.K)
+		elif method 	== 'DOVE':		gradient_calculator = DOVE(self.OVE_n, self.K)
+		else:						raise ValueError('Not a valid method method.')
+		
 
-					W[grad_indices] += 0.1*np.outer(grad,self.X_train[data_index])
-					print self.score(W)
-					#if (i%round(self.n_eval_loss+1) == 0):
-						#print self.tester.test(W)
-						#self.param_history.append(numpy.array(params))
+		rep_scores_cum_work = []
+		for rep in xrange(repetitions):
+			#print(rep)
+			W = np.zeros((self.K,self.dim))
+			time = 0
+			prev_time = 0
+			scores_cum_work = []
+			while time < self.time_total:
+				data_index = randint(0,self.n_samples_train-1)
+				grad_indices , grad , work = gradient_calculator.calculate_gradient(self.X_train[data_index],self.Y_train[data_index],W)
+				time += work
+				W[grad_indices] += 0.1*np.outer(grad,self.X_train[data_index])
+				if (time > (prev_time + float(self.time_total) / self.n_eval_loss)):
+					prev_time = time
+					#print self.tester.test(W)
+					#self.param_history.append(numpy.array(params))
+					scores_cum_work.append([self.score(W) , time])
+			rep_scores_cum_work.append(scores_cum_work)
+		self.method_scores[method] = rep_scores_cum_work
+
+	def save_results(self):
+		# Pickle results
+		pickle_name = os.getcwd() + "/Data/Pickled_scores/"+"_".join(self.method_scores.keys())+"_"+self.data_path[self.data_path.rfind("/")+1:]+".p"
+		with open(pickle_name, 'wb') as f:
+			pickle.dump(self.method_scores, f)
+
+	def plot_results(self):
+
+		if 'EXACT' not in self.method_scores.keys():
+			print("Exact method was not run so cannot print")
+			return
+
+		times = [score_time[1] for score_time in self.method_scores['EXACT'][0]]
+		inter_time = (times[1] - times[0])*0.9 # Window around time periods. Multiplied by 0.9 so times[i+1] and times[i] do not overlap
+		fig, ax = plt.subplots()
+		for method , rep_scores_cum_work in self.method_scores.iteritems():
+			flattened_score_times = [score_time for rep in rep_scores_cum_work for score_time in rep]
+			flattened_score_times.sort(key = lambda x: x[1]) # So that they are ordered in increasing times
+			scores_times = [[score_time[0] for score_time in flattened_score_times if abs(score_time[1]-time)<=inter_time] for time in times]
+			scores_time_mean = [np.mean(scores_time) for  scores_time in scores_times]
+			scores_time_std = [np.std(scores_time) for  scores_time in scores_times]
+			ax.errorbar(times,scores_time_mean, yerr = scores_time_std, label=method)
+
+		legend = ax.legend(loc='bottom right', shadow=True)
+		plt.show()
+
+		for method , rep_scores_cum_work in self.method_scores.iteritems():
+			final_scores = [ scores_cum_work[-1][0] for scores_cum_work in rep_scores_cum_work]
+			print "Mean final score %.2f with std %.2f" %(np.mean(final_scores) , np.std(final_scores))
 
 
 
 if __name__ == "__main__":
 
 	# Read hyperparameters from the terminal
-	data_path , hyper_param , repetitions , work_total, work_frac, eval_delay = readHyperParameters()
+	data_path , hyper_param , repetitions , time_total, n_eval_loss, NS_n, OVE_n = readHyperParameters()
 
 	# Create trainer class to run the Trains in
-	solver = Solver(data_path , hyper_param, repetitions , work_total, work_frac, eval_delay)
-	for method in ['scikit_learn','exact','NS','OVE','DNS','DOVE']:#
+	solver = Solver(data_path , hyper_param, repetitions , time_total, n_eval_loss, NS_n, OVE_n)
+	for method in ['EXACT','NS','DNS']:#'scikit_learn','DOVE','OVE',
 		solver.fit(method)
+	#solver.save_results()
+	solver.plot_results()
+
+
 
 
