@@ -4,9 +4,9 @@ import numpy as np
 from numpy.random import randn, choice
 
 # General Hyperparameters
-K = 10**3													# Number of classes
+K = 10**1													# Number of classes
 dim = 2													# Dimension
-n_datapoints = 10**6										# Number of datapoints
+n_datapoints = 10**4										# Number of datapoints
 train_test_split = 0.7									# Fraction that is training data
 print_or_save = "save"#"print"									# Whether to print or save the data
 
@@ -22,7 +22,7 @@ for i in xrange(n_datapoints):
 X_Y = np.hstack((X,Y))
 
 # Save or print simulated data
-str_header = 'Data/Simulated/simulated_data_K_%d_dim_%d_n_datapoints_%d'%(K, dim, n_datapoints)+'_'	# Gives details on parameters for how data simulated
+str_header = '../UnbiasedSoftmaxData/Simulated/simulated_data_K_%d_dim_%d_n_datapoints_%d'%(K, dim, n_datapoints)+'_'	# Gives details on parameters for how data simulated
 for data in ["train","test"]:
 	# Set indices for training or testing data
 	data_range = range(int(train_test_split*n_datapoints)) if data == "train" else range(int(train_test_split*n_datapoints), n_datapoints)

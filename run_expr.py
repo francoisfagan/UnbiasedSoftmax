@@ -9,23 +9,28 @@ import pdb
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
-from random import randint
+from numpy.random import random
 from sklearn import linear_model
 from unbiased_gradients import *
 import pickle
 import os
 
+
+
+
+
 def readHyperParameters():
-	data_path = "Data/Simulated/simulated_data_K_100_dim_2_n_datapoints_100000"
+	data_path = "../UnbiasedSoftmaxData/Simulated/simulated_data_K_100_dim_2_n_datapoints_100000"
 
 	hyper_param = 0
-	repetitions = 10
+	repetitions = 5
 	time_total = 10**5
 	n_eval_loss = 10
 	NS_n = 5
 	OVE_n = 5
+	p2_scale = 3
 
-	return [data_path , hyper_param , repetitions , time_total, n_eval_loss, NS_n, OVE_n]
+	return [data_path , hyper_param , repetitions , time_total, n_eval_loss, NS_n, OVE_n, p2_scale]
 	# # Load hyperparameters from the terminal
  #    if len(sys.argv) > 1:
  #        data_set = sys.argv[1]
@@ -52,7 +57,7 @@ def readHyperParameters():
 
 class Solver:
 
-	def __init__(self, data_path, hyper_param, repetitions, time_total, n_eval_loss, NS_n, OVE_n):
+	def __init__(self, data_path, hyper_param, repetitions, time_total, n_eval_loss, NS_n, OVE_n, p2_scale):
 
 		# Set hyperparameters
 		self.hyper_param = hyper_param
@@ -83,12 +88,17 @@ class Solver:
 		# Set algorithm constants
 		self.NS_n = NS_n
 		self.OVE_n = OVE_n
+		self.p2_scale = p2_scale
 
 		# store results of running methods
-		self.method_scores = {}
+		self.method_test_scores = {}
+		self.method_train_scores = {}
 
-	def score(self,W):
+	def test_score(self,W):
 		return np.mean(np.argmax(W.dot(self.X_test.T),axis=0)==self.Y_test)
+
+	def train_score(self,W):
+		return np.mean(np.argmax(W.dot(self.X_train.T),axis=0)==self.Y_train)
 		
 	def scikit_learn(self):
 		logreg = linear_model.LogisticRegression(C=1e5,solver ='newton-cg',multi_class='multinomial',fit_intercept=False)
@@ -101,21 +111,23 @@ class Solver:
 			self.scikit_learn()
 			return
 
-		if method 		== 'EXACT':		gradient_calculator = EXACT()
+		if   method 	== 'EXACT':		gradient_calculator = EXACT()
 		elif method 	== 'NS':		gradient_calculator = NS(self.NS_n)
 		elif method 	== 'OVE':		gradient_calculator = OVE(self.OVE_n)
-		elif method 	== 'DNS':		gradient_calculator = DNS(self.NS_n, self.K)
-		elif method 	== 'DOVE':		gradient_calculator = DOVE(self.OVE_n, self.K)
+		elif method 	== 'DNS':		gradient_calculator = DNS(self.NS_n, self.K, self.p2_scale)
+		elif method 	== 'DOVE':		gradient_calculator = DOVE(self.OVE_n, self.K, self.p2_scale)
 		else:						raise ValueError('Not a valid method method.')
 		
 
-		rep_scores_cum_work = []
+		self.method_test_scores[method] = []
+		self.method_train_scores[method] = []
 		for rep in xrange(repetitions):
 			#print(rep)
 			W = np.zeros((self.K,self.dim))
 			time = 0
 			prev_time = 0
-			scores_cum_work = []
+			test_scores_cum_work = []
+			train_scores_cum_work = []
 			while time < self.time_total:
 				data_index = randint(0,self.n_samples_train-1)
 				grad_indices , grad , work = gradient_calculator.calculate_gradient(self.X_train[data_index],self.Y_train[data_index],W)
@@ -125,9 +137,10 @@ class Solver:
 					prev_time = time
 					#print self.tester.test(W)
 					#self.param_history.append(numpy.array(params))
-					scores_cum_work.append([self.score(W) , time])
-			rep_scores_cum_work.append(scores_cum_work)
-		self.method_scores[method] = rep_scores_cum_work
+					test_scores_cum_work.append([self.test_score(W) , time])
+					train_scores_cum_work.append([self.train_score(W) , time])
+			self.method_test_scores[method].append(test_scores_cum_work)
+			self.method_train_scores[method].append(train_scores_cum_work)
 
 	def save_results(self):
 		# Pickle results
@@ -135,16 +148,24 @@ class Solver:
 		with open(pickle_name, 'wb') as f:
 			pickle.dump(self.method_scores, f)
 
-	def plot_results(self):
+	def plot_results(self,test_or_train):
 
-		if 'EXACT' not in self.method_scores.keys():
-			print("Exact method was not run so cannot print")
+
+		if test_or_train == 'Test':
+			method_scores = self.method_test_scores
+		elif test_or_train == 'Train':
+			method_scores = self.method_train_scores
+		else:
+			print("Select 'Test' or 'Train' to plot results.")
+
+		if 'EXACT' not in method_scores.keys():
+			print("Exact method was not run so cannot plot")
 			return
 
-		times = [score_time[1] for score_time in self.method_scores['EXACT'][0]]
+		times = [score_time[1] for score_time in method_scores['EXACT'][0]]
 		inter_time = (times[1] - times[0])*0.9 # Window around time periods. Multiplied by 0.9 so times[i+1] and times[i] do not overlap
 		fig, ax = plt.subplots()
-		for method , rep_scores_cum_work in self.method_scores.iteritems():
+		for method , rep_scores_cum_work in method_scores.iteritems():
 			flattened_score_times = [score_time for rep in rep_scores_cum_work for score_time in rep]
 			flattened_score_times.sort(key = lambda x: x[1]) # So that they are ordered in increasing times
 			scores_times = [[score_time[0] for score_time in flattened_score_times if abs(score_time[1]-time)<=inter_time] for time in times]
@@ -152,26 +173,34 @@ class Solver:
 			scores_time_std = [np.std(scores_time) for  scores_time in scores_times]
 			ax.errorbar(times,scores_time_mean, yerr = scores_time_std, label=method)
 
-		legend = ax.legend(loc='bottom right', shadow=True)
+		legend = ax.legend(loc='lower right', shadow=True)
+
+		plt.xlabel('Time')
+		plt.ylabel('Score')
+		plt.title(test_or_train+' accuracy')
+		plot_save_name = os.getcwd() + "/Data/Plots/"+"_".join(method_scores.keys())+"_"+test_or_train+"_"+self.data_path[self.data_path.rfind("/")+1:]+".png"
+		plt.savefig(plot_save_name)
 		plt.show()
 
-		for method , rep_scores_cum_work in self.method_scores.iteritems():
+		for method , rep_scores_cum_work in method_scores.iteritems():
 			final_scores = [ scores_cum_work[-1][0] for scores_cum_work in rep_scores_cum_work]
 			print "Mean final score %.2f with std %.2f" %(np.mean(final_scores) , np.std(final_scores))
 
 
 
 if __name__ == "__main__":
+	np.random.seed(1)
 
 	# Read hyperparameters from the terminal
-	data_path , hyper_param , repetitions , time_total, n_eval_loss, NS_n, OVE_n = readHyperParameters()
+	data_path , hyper_param , repetitions , time_total, n_eval_loss, NS_n, OVE_n, p2_scale = readHyperParameters()
 
 	# Create trainer class to run the Trains in
-	solver = Solver(data_path , hyper_param, repetitions , time_total, n_eval_loss, NS_n, OVE_n)
-	for method in ['EXACT','NS','DNS']:#'scikit_learn','DOVE','OVE',
+	solver = Solver(data_path , hyper_param, repetitions , time_total, n_eval_loss, NS_n, OVE_n, p2_scale)
+	for method in ['EXACT','OVE','DOVE']:#'scikit_learn',,'NS','DNS'
 		solver.fit(method)
 	#solver.save_results()
-	solver.plot_results()
+	solver.plot_results('Test')
+	solver.plot_results('Train')
 
 
 

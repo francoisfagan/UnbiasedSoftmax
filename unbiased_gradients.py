@@ -60,7 +60,7 @@ def OVE_gradient(x,y,W,n):
 
 	# Sample indices and calculate gradient
 	indices = (int(y)+1+choice(K-1, n, replace = False) )%K 
-	grad 	= - sigma( W[indices,:].dot(x) - W[y,:].dot(x) ) * (K-1) / n
+	grad 	= - sigma( W[indices,:].dot(x) - W[y,:].dot(x) ) / n #* (K-1)
 
 	# Add y index and gradient
 	indices =  np.append( indices , int(y) )
@@ -79,7 +79,7 @@ def RB_NS_gradient(x,y,W,n):
 def RB_OVE_gradient(x,y,W,n):
 	# Rao-Blackwellized one-vs-each gradient
 	K 		= W.shape[0]
-	grad 	= - sigma( W.dot(x) - W[y,:].dot(x) ) 
+	grad 	= - sigma( W.dot(x) - W[y,:].dot(x) )  / (K-1)
 	grad[y] = 0
 	grad[y] = - sum(grad)
 	#pdb.set_trace()
@@ -119,10 +119,10 @@ class OVE(gradient):
 # Debiased gradient classes
 
 class DNS(gradient):
-	def __init__(self, n, K):
+	def __init__(self, n, K, p2_scale):
 		self.n = n
 		self.K = K
-		self.p2 = sqrt(float(n)/K)
+		self.p2 = p2_scale*sqrt(float(n)/K)
 
 		# self.n_numerator = 0
 		# self.n_denominator = 0
@@ -158,10 +158,10 @@ class DNS(gradient):
 			return [indices_EXACT , grad, self.K]
 
 class DOVE(gradient):
-	def __init__(self, n, K):
+	def __init__(self, n, K, p2_scale):
 		self.n = n
 		self.K = K
-		self.p2 = sqrt(float(n)/K)
+		self.p2 = p2_scale*sqrt(float(n)/K)
 
 	def calculate_gradient(self, x,y,W):
 		if random() > self.p2 :
