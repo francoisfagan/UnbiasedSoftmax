@@ -45,7 +45,7 @@ def NS_gradient(x,y,W,n):#_star
 	# else:
 	# 	n = np.ceil(n_star) if random() < (n_star - np.floor(n_star)) else np.floor(n_star)
 	
-	indices = (int(y)+1+choice(K-1, n, replace = False) )%K 
+	indices = (int(y)+1+choice(K-1, n, replace = False) )%K #(int(y)+1+randint(K-1)+np.arange(n) )%K # Prevents sampling many random numbers like (int(y)+1+choice(K-1, n, replace = False) )%K 
 	grad 	= - sigma(W[indices,:].dot(x))
 
 	# Add y index and gradient
@@ -59,7 +59,7 @@ def OVE_gradient(x,y,W,n):
 	K = W.shape[0]
 
 	# Sample indices and calculate gradient
-	indices = (int(y)+1+choice(K-1, n, replace = False) )%K 
+	indices = (int(y)+1+choice(K-1, n, replace = False) )%K #(int(y)+1+randint(K-1)+np.arange(n) )%K # Prevents sampling many random numbers like (int(y)+1+choice(K-1, n, replace = False) )%K 
 	grad 	= - sigma( W[indices,:].dot(x) - W[y,:].dot(x) ) / n #* (K-1)
 
 	# Add y index and gradient
@@ -161,7 +161,7 @@ class DOVE(gradient):
 	def __init__(self, n, K, p2_scale):
 		self.n = n
 		self.K = K
-		self.p2 = p2_scale*sqrt(float(n)/K)
+		self.p2 = p2_scale*(float(n)/K)**(1.0/4)#0.5#p2_scale*sqrt(float(n)/K)
 
 	def calculate_gradient(self, x,y,W):
 		if random() > self.p2 :

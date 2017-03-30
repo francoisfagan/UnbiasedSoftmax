@@ -5,14 +5,14 @@ from numpy.random import randn, choice
 
 np.random.seed(1)
 # General Hyperparameters
-K = 10**2													# Number of classes
+K = 10**3													# Number of classes
 dim = 2													# Dimension
-n_datapoints = 10**5										# Number of datapoints
+n_datapoints = 10**6										# Number of datapoints
 train_test_split = 0.7									# Fraction that is training data
 print_or_save = "save"#"print"									# Whether to print or save the data
 
 # Simulate data
-sigma = 1
+sigma = 10
 W = randn(K,dim)*sigma										# True W value
 X = randn(n_datapoints,dim)								# Covariates, one for each datapoint
 Y = np.zeros((n_datapoints,1))

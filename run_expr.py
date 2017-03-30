@@ -14,16 +14,46 @@ from sklearn import linear_model
 from unbiased_gradients import *
 import pickle
 import os
-
-
-
+from sklearn.datasets import load_svmlight_file
 
 
 def readHyperParameters():
-	data_path = "../UnbiasedSoftmaxData/Simulated/simulated_data_K_100_dim_2_n_datapoints_100000"
+
+	# # Load hyperparameters from the terminal
+	# if len(sys.argv) > 1:
+	# 	data_set = sys.argv[1]
+	# 	if data_set == 'simulated1e3':
+	# 		data_path = "../UnbiasedSoftmaxData/Simulated/simulated_data_K_1000_dim_2_n_datapoints_1000000_sigma_1"
+	# 	elif data_set == 'simulated1e2':
+	# 		data_path = "../UnbiasedSoftmaxData/Simulated/simulated_data_K_100_dim_2_n_datapoints_100000"
+	# 	elif data_set == 'Bibtex':
+	# 		data_path = "../UnbiasedSoftmaxData/LIBSVM/Bibtex_data.txt"
+	# 	elif data_set == 'aloi':
+	# 		data_path = "../UnbiasedSoftmaxData/LIBSVM/aloi"
+	# 	elif data_set == 'Delicious':
+	# 		data_path = "../UnbiasedSoftmaxData/LIBSVM/Delicious_data"
+	# 	elif data_set == 'eurlex':
+	# 		data_path = "../UnbiasedSoftmaxData/LIBSVM/eurlex_train"
+	# 	else:
+	# 		print"""
+	# 		------------------------------------
+	# 		Not a valid training set
+	# 		------------------------------------
+	# 		"""
+	# 		exit(0)
+
+	# else:
+	# 	print"""
+	# 	------------------------------------
+	# 	Please provide a training set
+	# 	------------------------------------
+	# 	"""
+	# 	exit(0)
+
+	data_path = "../UnbiasedSoftmaxData/Simulated/simulated_data_K_1000_dim_2_n_datapoints_1000000_sigma_1"
 
 	hyper_param = 0.1
-	repetitions = 10
+	repetitions = 5
 	time_total = 10**5
 	n_eval_loss = 10
 	NS_n = 5
@@ -31,29 +61,24 @@ def readHyperParameters():
 	p2_scale = 1
 
 	return [data_path , hyper_param , repetitions , time_total, n_eval_loss, NS_n, OVE_n, p2_scale]
-	# # Load hyperparameters from the terminal
- #    if len(sys.argv) > 1:
- #        data_set = sys.argv[1]
- #        max_iter = int(sys.argv[2])
- #        hyper_param = float(sys.argv[3])
- #        repetitions = int(sys.argv[4])
 
-
- #        return [train_path, test_path , max_iter , hyper_param , repetitions]
- #    else:
- #        print"""
- #        ------------------------------------
- #        Recommended defaults:
- #        max_iter = 5000
- #        hyper_param = 0.01
- #        repetitions = 1
- #        ------------------------------------
- #        """
- #        exit(0)
 
 
 	# Plot figures
+def loadLIBSVMdata(data_path):
+	train_test_split = 0.7
+	data = load_svmlight_file(data_path, multilabel=True)
+	X = data[0].toarray()
+	Y = data[1]
+	Y = [y[0] for y in Y]
+	#pdb.set_trace()
 
+	n_samples = len(Y)
+	X_train = X[:int(train_test_split*n_samples),:]
+	Y_train = Y[:int(train_test_split*n_samples)]
+	X_test = X[int(train_test_split*n_samples):,:]
+	Y_test = Y[int(train_test_split*n_samples):]
+	return X_train , Y_train , X_test , Y_test
 
 class Solver:
 
@@ -67,21 +92,25 @@ class Solver:
 
 		# Load training and test data
 		self.data_path = data_path
-		train_data = np.genfromtxt(data_path + "_train.csv", delimiter=',')
-		test_data = np.genfromtxt(data_path + "_test.csv", delimiter=',')
+		if data_path[:29] == "../UnbiasedSoftmaxData/LIBSVM":
+			self.X_train , self.Y_train , self.X_test , self.Y_test = loadLIBSVMdata(data_path)
+		else:
+			train_data = np.genfromtxt(data_path + "_train.csv", delimiter=',')
+			test_data = np.genfromtxt(data_path + "_test.csv", delimiter=',')
 
-		# Store training data
-		self.X_train = train_data[:,:-1]
-		self.Y_train = train_data[:,-1]
-		self.n_samples_train = int(train_data.shape[0])
+			# Store training data
+			self.X_train = train_data[:,:-1]
+			self.Y_train = train_data[:,-1]
 
-		# Store test data
-		self.X_test = test_data[:,:-1]
-		self.Y_test = test_data[:,-1]
-		self.n_samples_test = int(test_data.shape[0])
+			# Store test data
+			self.X_test = test_data[:,:-1]
+			self.Y_test = test_data[:,-1]
+
+		self.n_samples_train = len(self.Y_train)
+		self.n_samples_test = len(self.Y_test)
 
 		# Set parameter values using training data
-		self.dim = int(train_data.shape[1]-1)
+		self.dim = int(len(self.X_train[0]))
 		self.K = int(max(self.Y_train)+1)
 		# self.q = np.array([1.0/self.K]*self.K)
 
@@ -89,6 +118,7 @@ class Solver:
 		self.NS_n = NS_n
 		self.OVE_n = OVE_n
 		self.p2_scale = p2_scale
+		self.start_indices = randint(0,self.n_samples_train,repetitions)
 
 
 		self.parameter_save_name = "_hyper_%d_rep_%d_time_%d_n_eval_loss_%d_NS_n_%d_OVE_n_%d_p2_scale_%d_"%(hyper_param,repetitions,time_total,n_eval_loss,NS_n,OVE_n,p2_scale)+data_path[data_path.rfind("/")+1:]
@@ -96,12 +126,13 @@ class Solver:
 		# store results of running methods
 		self.method_test_scores = {}
 		self.method_train_scores = {}
+		#pdb.set_trace()
 
 	def test_score(self,W):
-		return np.mean(np.argmax(W.dot(self.X_test.T),axis=0)==self.Y_test)
+		return np.mean(np.argmax(W.dot(self.X_test[::10,:].T),axis=0)==self.Y_test[::10])#
 
 	def train_score(self,W):
-		return np.mean(np.argmax(W.dot(self.X_train.T),axis=0)==self.Y_train)
+		return np.mean(np.argmax(W.dot(self.X_train[::10,:].T),axis=0)==self.Y_train[::10])
 		
 	def scikit_learn(self):
 		logreg = linear_model.LogisticRegression(C=1e5,solver ='newton-cg',multi_class='multinomial',fit_intercept=False)
@@ -131,19 +162,18 @@ class Solver:
 			prev_time = 0
 			test_scores_cum_work = []
 			train_scores_cum_work = []
-			iteration = 0
+			iteration = self.start_indices[rep]
 			while time < self.time_total:
-				data_index = randint(0,self.n_samples_train-1)
+				data_index = iteration % self.n_samples_train #data_index = randint(0,self.n_samples_train) this would have more variance in the results, therefore don't use
 				grad_indices , grad , work = gradient_calculator.calculate_gradient(self.X_train[data_index],self.Y_train[data_index],W)
+				#pdb.set_trace()
 				W[grad_indices] += self.hyper_param*np.outer(grad,self.X_train[data_index])*(0.9*(self.time_total-time)/float(self.time_total) +0.1)
 				time += work
 				iteration += 1
 				if (time > (prev_time + float(self.time_total) / self.n_eval_loss)):
 					prev_time = time
-					#print self.tester.test(W)
-					#self.param_history.append(numpy.array(params))
 					test_scores_cum_work.append([self.test_score(W) , time])
-					train_scores_cum_work.append([self.train_score(W) , time])
+					#train_scores_cum_work.append([self.train_score(W) , time])
 			self.method_test_scores[method].append(test_scores_cum_work)
 			self.method_train_scores[method].append(train_scores_cum_work)
 
@@ -162,6 +192,7 @@ class Solver:
 			method_scores = self.method_train_scores
 		else:
 			print("Select 'Test' or 'Train' to plot results.")
+			return
 
 		if 'EXACT' not in method_scores.keys():
 			print("Exact method was not run so cannot plot")
@@ -189,11 +220,6 @@ class Solver:
 		plt.savefig(plot_save_name)
 		plt.show()
 
-		for method , rep_scores_cum_work in method_scores.iteritems():
-			final_scores = [ scores_cum_work[-1][0] for scores_cum_work in rep_scores_cum_work]
-			print "Mean final score %.2f with std %.2f" %(np.mean(final_scores) , np.std(final_scores))
-
-
 
 if __name__ == "__main__":
 	np.random.seed(1)
@@ -203,11 +229,11 @@ if __name__ == "__main__":
 
 	# Create trainer class to run the Trains in
 	solver = Solver(data_path , hyper_param, repetitions , time_total, n_eval_loss, NS_n, OVE_n, p2_scale)
-	for method in ['EXACT','DNS','DOVE','OVE','NS']:#'scikit_learn',
+	for method in ['EXACT','DOVE','OVE']:#'scikit_learn',,'DNS','NS'
 		solver.fit(method)
 	#solver.save_results()
 	solver.plot_results('Test')
-	solver.plot_results('Train')
+	#solver.plot_results('Train')
 
 
 
