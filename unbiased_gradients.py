@@ -28,10 +28,13 @@ def EXACT_gradient(x,y,W):
 	Output:
 		grad:		Indices with non-zero gradients and
 	"""
-	K 		= W.shape[0]
-	grad 	= np.exp(W.dot(x)) 
-	grad 	= -grad/sum(grad)
-	grad[y] += 1
+	#pdb.set_trace()
+	K 			= W.shape[0]
+	inner_prod 	= W.dot(x)
+	inner_prod  -= np.max(inner_prod)
+	grad 		= np.exp(inner_prod) 
+	grad 		= -grad/sum(grad)
+	grad[y] 	= grad[y] + 1
 	return [ range(K) , grad , K ]
 
 def NS_gradient(x,y,W,n):#_star
@@ -169,6 +172,8 @@ class DOVE(gradient):
 		else :
 			indices_EXACT , grad_EXACT , _ = EXACT_gradient(x,y,W)
 			grad_biased = RB_OVE_gradient(x,y,W,self.n)
+			#pdb.set_trace()
+			#print "Exact: %f , biased: %f"(norm(grad_EXACT),norm(grad_biased))
 			grad = (grad_EXACT - grad_biased*(1-self.p2) ) / self.p2
 			return [indices_EXACT , grad, self.K]
 

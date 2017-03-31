@@ -8,6 +8,7 @@
 import pdb
 import sys
 import numpy as np
+from numpy.linalg import norm
 import matplotlib.pyplot as plt
 from numpy.random import random
 from sklearn import linear_model
@@ -50,11 +51,11 @@ def readHyperParameters():
 	# 	"""
 	# 	exit(0)
 
-	data_path = "../UnbiasedSoftmaxData/Simulated/simulated_data_K_1000_dim_2_n_datapoints_1000000_sigma_1"
+	data_path = "../UnbiasedSoftmaxData/Simulated/simulated_data_K_100_dim_2_n_datapoints_100000"
 
 	hyper_param = 0.1
-	repetitions = 5
-	time_total = 10**5
+	repetitions = 1
+	time_total = 10**6
 	n_eval_loss = 10
 	NS_n = 5
 	OVE_n = 5
@@ -132,7 +133,7 @@ class Solver:
 		return np.mean(np.argmax(W.dot(self.X_test[::10,:].T),axis=0)==self.Y_test[::10])#
 
 	def train_score(self,W):
-		return np.mean(np.argmax(W.dot(self.X_train[::10,:].T),axis=0)==self.Y_train[::10])
+		return np.mean(np.argmax(W.dot(self.X_train[::50,:].T),axis=0)==self.Y_train[::50])
 		
 	def scikit_learn(self):
 		logreg = linear_model.LogisticRegression(C=1e5,solver ='newton-cg',multi_class='multinomial',fit_intercept=False)
@@ -165,9 +166,19 @@ class Solver:
 			iteration = self.start_indices[rep]
 			while time < self.time_total:
 				data_index = iteration % self.n_samples_train #data_index = randint(0,self.n_samples_train) this would have more variance in the results, therefore don't use
-				grad_indices , grad , work = gradient_calculator.calculate_gradient(self.X_train[data_index],self.Y_train[data_index],W)
+				# if time < self.time_total/2.0:
+				# 	gradient_calculator = OVE(self.OVE_n)
+				# else:
+				# 	if   method 	== 'EXACT':		gradient_calculator = EXACT()
+				# 	elif method 	== 'NS':		gradient_calculator = NS(self.NS_n)
+				# 	elif method 	== 'OVE':		gradient_calculator = OVE(self.OVE_n)
+				# 	elif method 	== 'DNS':		gradient_calculator = DNS(self.NS_n, self.K, self.p2_scale)
+				# 	elif method 	== 'DOVE':		gradient_calculator = DOVE(self.OVE_n, self.K, self.p2_scale)
+				# 	else:						raise ValueError('Not a valid method method.')
+				grad_indices , grad , work = gradient_calculator.calculate_gradient(self.X_train[data_index],int(self.Y_train[data_index]),W)
+				#grad = (grad/(norm(grad) +10**(-4)))*2
 				#pdb.set_trace()
-				W[grad_indices] += self.hyper_param*np.outer(grad,self.X_train[data_index])*(0.9*(self.time_total-time)/float(self.time_total) +0.1)
+				W[grad_indices] = W[grad_indices] + self.hyper_param*np.outer(grad,self.X_train[data_index])#*(0.9*(self.time_total-time)/float(self.time_total) +0.1)
 				time += work
 				iteration += 1
 				if (time > (prev_time + float(self.time_total) / self.n_eval_loss)):
@@ -179,9 +190,9 @@ class Solver:
 
 	def save_results(self):
 		# Pickle results
-		pickle_name = os.getcwd() + "/Data/Pickled_scores/"+"_".join(self.method_scores.keys())+self.parameter_save_name+".p"
+		pickle_name = os.getcwd() + "/Data/Pickled_scores/"+"_".join(self.method_test_scores.keys())+self.parameter_save_name+".p"
 		with open(pickle_name, 'wb') as f:
-			pickle.dump(self.method_scores, f)
+			pickle.dump(self.method_test_scores, f)
 
 	def plot_results(self,test_or_train):
 
@@ -216,8 +227,10 @@ class Solver:
 		plt.xlabel('Time')
 		plt.ylabel('Score')
 		plt.title(test_or_train+' accuracy')
-		plot_save_name = os.getcwd() + "/Data/Plots/"+"_".join(method_scores.keys())+"_"+test_or_train+self.parameter_save_name+".png"
-		plt.savefig(plot_save_name)
+		plot_save_name = os.getcwd() + "/Data/Plots/"+"_".join(method_scores.keys())+"_"+test_or_train+self.parameter_save_name#+".png"
+		#plt.savefig(plot_save_name)
+		fig.set_canvas(plt.gcf().canvas)
+		fig.savefig(plot_save_name + ".pdf", format='pdf')
 		plt.show()
 
 
@@ -229,7 +242,7 @@ if __name__ == "__main__":
 
 	# Create trainer class to run the Trains in
 	solver = Solver(data_path , hyper_param, repetitions , time_total, n_eval_loss, NS_n, OVE_n, p2_scale)
-	for method in ['EXACT','DOVE','OVE']:#'scikit_learn',,'DNS','NS'
+	for method in ['EXACT','DNS','NS','DOVE','OVE']:#'scikit_learn',
 		solver.fit(method)
 	#solver.save_results()
 	solver.plot_results('Test')
