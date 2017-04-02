@@ -32,9 +32,9 @@ def readHyperParameters():
 	# 	elif data_set == 'aloi':
 	# 		data_path = "../UnbiasedSoftmaxData/LIBSVM/aloi"
 	# 	elif data_set == 'Delicious':
-	# 		data_path = "../UnbiasedSoftmaxData/LIBSVM/Delicious_data"
+	# 		data_path = "../UnbiasedSoftmaxData/LIBSVM/Delicious_data.txt"
 	# 	elif data_set == 'eurlex':
-	# 		data_path = "../UnbiasedSoftmaxData/LIBSVM/eurlex_train"
+	# 		data_path = "../UnbiasedSoftmaxData/LIBSVM/eurlex_train.txt"
 	# 	else:
 	# 		print"""
 	# 		------------------------------------
@@ -53,13 +53,23 @@ def readHyperParameters():
 
 	data_path = "../UnbiasedSoftmaxData/Simulated/simulated_data_K_100_dim_2_n_datapoints_100000"
 
-	hyper_param = 0.1
-	repetitions = 1
-	time_total = 10**6
+	hyper_param = 1
+	repetitions = 50
+	time_total = 10**5
 	n_eval_loss = 10
 	NS_n = 5
 	OVE_n = 5
 	p2_scale = 1
+
+	## For simulated data
+	# data_path = "../UnbiasedSoftmaxData/Simulated/simulated_data_K_100_dim_2_n_datapoints_100000"
+	# hyper_param = 0.1
+	# repetitions = 50
+	# time_total = 10**5
+	# n_eval_loss = 10
+	# NS_n = 5
+	# OVE_n = 5
+	# p2_scale = 1
 
 	return [data_path , hyper_param , repetitions , time_total, n_eval_loss, NS_n, OVE_n, p2_scale]
 
@@ -69,9 +79,11 @@ def readHyperParameters():
 def loadLIBSVMdata(data_path):
 	train_test_split = 0.7
 	data = load_svmlight_file(data_path, multilabel=True)
-	X = data[0].toarray()
+	#pdb.set_trace()
 	Y = data[1]
-	Y = [y[0] for y in Y]
+	i_Y_not_empty = [i for i,y in enumerate(Y) if y!=()]
+	X = data[0].toarray()[i_Y_not_empty,:]
+	Y = [Y[i][0] for i in i_Y_not_empty]
 	#pdb.set_trace()
 
 	n_samples = len(Y)
@@ -122,7 +134,7 @@ class Solver:
 		self.start_indices = randint(0,self.n_samples_train,repetitions)
 
 
-		self.parameter_save_name = "_hyper_%d_rep_%d_time_%d_n_eval_loss_%d_NS_n_%d_OVE_n_%d_p2_scale_%d_"%(hyper_param,repetitions,time_total,n_eval_loss,NS_n,OVE_n,p2_scale)+data_path[data_path.rfind("/")+1:]
+		self.parameter_save_name = "_hyper_%f_rep_%d_time_%d_n_eval_loss_%d_NS_n_%d_OVE_n_%d_p2_scale_%d_"%(hyper_param,repetitions,time_total,n_eval_loss,NS_n,OVE_n,p2_scale)+data_path[data_path.rfind("/")+1:]
 
 		# store results of running methods
 		self.method_test_scores = {}
@@ -130,7 +142,7 @@ class Solver:
 		#pdb.set_trace()
 
 	def test_score(self,W):
-		return np.mean(np.argmax(W.dot(self.X_test[::10,:].T),axis=0)==self.Y_test[::10])#
+		return np.mean(np.argmax(W.dot(self.X_test.T),axis=0)==self.Y_test)#[::10,:][::10]
 
 	def train_score(self,W):
 		return np.mean(np.argmax(W.dot(self.X_train[::50,:].T),axis=0)==self.Y_train[::50])
@@ -150,7 +162,9 @@ class Solver:
 		elif method 	== 'NS':		gradient_calculator = NS(self.NS_n)
 		elif method 	== 'OVE':		gradient_calculator = OVE(self.OVE_n)
 		elif method 	== 'DNS':		gradient_calculator = DNS(self.NS_n, self.K, self.p2_scale)
+		elif method 	== 'DNS_nonRB':	gradient_calculator = DNS_nonRB(self.NS_n, self.K, self.p2_scale)
 		elif method 	== 'DOVE':		gradient_calculator = DOVE(self.OVE_n, self.K, self.p2_scale)
+		elif method 	== 'DOVE_nonRB':gradient_calculator = DOVE_nonRB(self.OVE_n, self.K, self.p2_scale)
 		else:						raise ValueError('Not a valid method method.')
 		
 
@@ -178,7 +192,7 @@ class Solver:
 				grad_indices , grad , work = gradient_calculator.calculate_gradient(self.X_train[data_index],int(self.Y_train[data_index]),W)
 				#grad = (grad/(norm(grad) +10**(-4)))*2
 				#pdb.set_trace()
-				W[grad_indices] = W[grad_indices] + self.hyper_param*np.outer(grad,self.X_train[data_index])#*(0.9*(self.time_total-time)/float(self.time_total) +0.1)
+				W[grad_indices] = W[grad_indices] + self.hyper_param*np.outer(grad,self.X_train[data_index])*(0.9*(self.time_total-time)/float(self.time_total) +0.1)
 				time += work
 				iteration += 1
 				if (time > (prev_time + float(self.time_total) / self.n_eval_loss)):
@@ -212,7 +226,7 @@ class Solver:
 		times = [score_time[1] for score_time in method_scores['EXACT'][0]]
 		inter_time = (times[1] - times[0])*0.9 # Window around time periods. Multiplied by 0.9 so times[i+1] and times[i] do not overlap
 		fig, ax = plt.subplots()
-		for method in ['EXACT','OVE','DOVE','NS','DNS']:
+		for method in ['EXACT','OVE','DOVE','DOVE_nonRB','NS','DNS','DNS_nonRB']:
 			if method in method_scores.keys():
 				rep_scores_cum_work = method_scores[method]
 				flattened_score_times = [score_time for rep in rep_scores_cum_work for score_time in rep]
@@ -224,7 +238,7 @@ class Solver:
 
 		legend = ax.legend(loc='lower right', shadow=True)
 
-		plt.xlabel('Time')
+		plt.xlabel('No. inner products')
 		plt.ylabel('Score')
 		plt.title(test_or_train+' accuracy')
 		plot_save_name = os.getcwd() + "/Data/Plots/"+"_".join(method_scores.keys())+"_"+test_or_train+self.parameter_save_name#+".png"
@@ -242,9 +256,9 @@ if __name__ == "__main__":
 
 	# Create trainer class to run the Trains in
 	solver = Solver(data_path , hyper_param, repetitions , time_total, n_eval_loss, NS_n, OVE_n, p2_scale)
-	for method in ['EXACT','DNS','NS','DOVE','OVE']:#'scikit_learn',
+	for method in ['EXACT','DNS','NS','DOVE','OVE']:#'scikit_learn',,'DOVE_nonRB','DNS_nonRB'
 		solver.fit(method)
-	#solver.save_results()
+	solver.save_results()
 	solver.plot_results('Test')
 	#solver.plot_results('Train')
 

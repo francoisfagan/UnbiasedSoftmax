@@ -53,7 +53,7 @@ def NS_gradient(x,y,W,n):#_star
 
 	# Add y index and gradient
 	indices = np.append( indices , int(y) )
-	grad 	= np.append( grad , sigma(W[y,:].dot(x)) )
+	grad 	= np.append( grad , sigma(-W[y,:].dot(x)) )
 	return [ indices , grad , n ]
 
 def OVE_gradient(x,y,W,n):
@@ -76,7 +76,7 @@ def RB_NS_gradient(x,y,W,n):
 	# Rao-Blackwellized negative sampling gradient
 	K 		= W.shape[0]
 	grad 	= - n / float(K-1) * sigma(W.dot(x))
-	grad[y] = sigma(W[y,:].dot(x))
+	grad[y] = sigma(-W[y,:].dot(x))
 	return grad
 
 def RB_OVE_gradient(x,y,W,n):
@@ -126,6 +126,7 @@ class DNS(gradient):
 		self.n = n
 		self.K = K
 		self.p2 = p2_scale*sqrt(float(n)/K)
+		self.p2_counter = 0
 
 		# self.n_numerator = 0
 		# self.n_denominator = 0
@@ -136,7 +137,8 @@ class DNS(gradient):
 		# self.mean_RB_norm = 0
 
 	def calculate_gradient(self, x,y,W):
-		if random() > self.p2 :
+		self.p2_counter = (self.p2_counter + self.p2) % 1
+		if self.p2_counter >= self.p2 :
 			return NS_gradient(x,y,W,self.n)
 		else :
 			indices_EXACT , grad_EXACT , _ = EXACT_gradient(x,y,W)
@@ -160,14 +162,58 @@ class DNS(gradient):
 			grad = (grad_EXACT - grad_biased*(1-self.p2) ) / self.p2
 			return [indices_EXACT , grad, self.K]
 
+			# Debiased gradient classes
+
+class DNS_nonRB(gradient):
+	def __init__(self, n, K, p2_scale):
+		self.n = n
+		self.K = K
+		self.p2 = p2_scale*sqrt(float(n)/K)
+
+		# self.n_numerator = 0
+		# self.n_denominator = 0
+
+		# # Variables for updating n and p2 values
+		# self.mean_EXACT_RB_difference = 0
+		# self.mean_EXACT_RB_inner_product = 0
+		# self.mean_RB_norm = 0
+
+	def calculate_gradient(self, x,y,W):
+		if random() > self.p2 :
+			return NS_gradient(x,y,W,self.n)
+		else :
+			indices_EXACT , grad_EXACT , _ = EXACT_gradient(x,y,W)
+			indices_biased , grad_biased , _  = NS_gradient(x,y,W,self.n)
+
+			# # Update p2 variables
+			# K = W.shape[0]
+
+			# self.mean_EXACT_RB_difference += norm(grad_EXACT - grad_biased)**2 * norm(x)**2
+			# self.mean_EXACT_RB_inner_product += grad_biased.dot(grad_EXACT-grad_biased) * norm(x)**2
+			# self.mean_RB_norm += (grad_EXACT[y]**2 + (float(K)-1)/self.n * (norm(grad_biased[:y])**2 + norm(grad_biased[y+1:])**2)) * norm(x)**2
+			# p2_new = self.mean_EXACT_RB_difference / (2*self.mean_EXACT_RB_inner_product + self.mean_RB_norm)
+			# #print self.n/float(K)*p2_new
+
+			# Update n
+			# self.n_numerator += (grad_biased.dot(grad_EXACT) - grad_biased[y]*grad_EXACT[y])*self.n
+			# self.n_denominator += (grad_biased.dot(grad_biased) - grad_biased[y]*grad_biased[y])
+			# self.n = self.n_numerator / self.n_denominator
+			#print self.n
+
+			grad = grad_EXACT / self.p2
+			grad[indices_biased] =  - grad_biased*(1-self.p2)  / self.p2
+			return [indices_EXACT , grad, self.K]
+
 class DOVE(gradient):
 	def __init__(self, n, K, p2_scale):
 		self.n = n
 		self.K = K
-		self.p2 = p2_scale*(float(n)/K)**(1.0/4)#0.5#p2_scale*sqrt(float(n)/K)
+		self.p2 = p2_scale*sqrt(float(n)/K)#p2_scale*(float(n)/K)**(1.0/4)#0.5#
+		self.p2_counter = 0
 
 	def calculate_gradient(self, x,y,W):
-		if random() > self.p2 :
+		self.p2_counter = (self.p2_counter + self.p2) % 1
+		if self.p2_counter >= self.p2 :
 			return OVE_gradient(x,y,W,self.n)
 		else :
 			indices_EXACT , grad_EXACT , _ = EXACT_gradient(x,y,W)
@@ -175,6 +221,25 @@ class DOVE(gradient):
 			#pdb.set_trace()
 			#print "Exact: %f , biased: %f"(norm(grad_EXACT),norm(grad_biased))
 			grad = (grad_EXACT - grad_biased*(1-self.p2) ) / self.p2
+			return [indices_EXACT , grad, self.K]
+
+
+class DOVE_nonRB(gradient):
+	def __init__(self, n, K, p2_scale):
+		self.n = n
+		self.K = K
+		self.p2 = p2_scale*sqrt(float(n)/K)#p2_scale*(float(n)/K)**(1.0/4)#0.5#
+
+	def calculate_gradient(self, x,y,W):
+		if random() > self.p2 :
+			return OVE_gradient(x,y,W,self.n)
+		else :
+			indices_EXACT , grad_EXACT , _ = EXACT_gradient(x,y,W)
+			indices_biased , grad_biased , _ = OVE_gradient(x,y,W,self.n)
+			#pdb.set_trace()
+			#print "Exact: %f , biased: %f"(norm(grad_EXACT),norm(grad_biased))
+			grad = grad_EXACT / self.p2
+			grad[indices_biased] =  - grad_biased*(1-self.p2)  / self.p2
 			return [indices_EXACT , grad, self.K]
 
 
