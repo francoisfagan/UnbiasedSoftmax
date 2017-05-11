@@ -1,4 +1,51 @@
 
+	# # Rao-Blackwellized importance sampling gradient
+	# K 				= W.shape[0]
+
+	# # Calculate inner products and denominator
+	# inner 			= W.dot(x)
+	# inner_max_yD	= max([ inner[y] , np.max(inner[indices_D]) ])
+	# inner			-= inner_max_yD
+
+	# exp_inner 		= np.exp(inner)
+	# Z 				= exp_inner[y] + np.sum(exp_inner[indices_D]) * (K-1)/n
+
+	# grad 			= - exp_inner / (exp_inner + Z) #* n / (K-1)    
+	# grad[y] 		= 1- exp_inner[y] / Z
+	# return grad
+
+def IS_RB_gradient(x,y,W,n,indices_D):
+	# Importance sampling gradient that is Rao-Blackwellizable
+
+	K = W.shape[0]
+
+	# Sample indices
+	indices_U = (int(y)+1+choice(K-1, n, replace = True) )%K
+	#indices_U = list(set(indices_U) - set(indices_D))
+
+	# Calculate inner products and denominator
+	inner_y			= W[y,:].dot(x)
+	inner_D 		= W[indices_D,:].dot(x)
+	inner_U 		= W[indices_U,:].dot(x)
+	inner_max_yD	= max([ inner_y , np.max(inner_D) ])
+
+	# Log-sum-exp trick. Note that we only take the max over terms in the denominator, else it is possible that denominator=0.
+	inner_y			-= inner_max_yD
+	inner_D 		-= inner_max_yD
+	inner_U 		-= inner_max_yD
+
+	# Calculate scores and denominator
+	exp_y 			= np.exp(inner_y)
+	exp_D 			= np.exp(inner_D)
+	exp_U 			= np.exp(inner_U)
+	Z 				= exp_y + np.sum(exp_D) * (K-1)/n  # exp_y * n / (K-1) + np.sum(exp_D) Does terribly!
+
+	# Add y index and gradient
+	indices = np.concatenate( ([int(y)] , indices_U) ) #indices_D , 
+	#grad 	= np.concatenate( ([sigma(log_Z - inner_y)] , - sigma(inner_D - log_Z) , - sigma(inner_U - log_Z)  / len(indices_U) * (K-1-len(indices_D)) )) 
+	grad 	= np.concatenate( ( [1-exp_y / Z] , - exp_U / (exp_U  + Z) * (K-1)/n ) ) #* (K-1)/n
+
+	return [ indices , grad , 2*n ]
 
 def multilevel(X,y,w,W_p,p = 1-2**(-3.0/2)):
 	"""

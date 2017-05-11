@@ -32,22 +32,5 @@ for data in ["train","test"]:
 	np.savetxt(str_header+data+'.csv', X_Y[data_range,:], delimiter=",")
 	# data_str = "\n".join([ str(", ".join(str(x) for x in X[i]))+", "+str(Y[i]) for i in data_range])
 
-	# # Either print or save the results
-	# if print_or_save == "print":
-	# 	print(data_str)
-	# 	print("")
-	# elif print_or_save == "save":
-	# 	with open(str_header+data+'.csv', 'w') as the_file:
-	# 			the_file.write(data_str)
-	# else:
-	# 	print("Either print or save the data!")
-
-# # Either print or save the results
-# if print_or_save == "print":
-# 	print(W)
-# 	print("")
-# elif print_or_save == "save":
-# 	np.savetxt(str_header+"W"+'.csv',W, delimiter=' , ')
-# else:
-# 	print("Either print or save the data!")
+\
 
