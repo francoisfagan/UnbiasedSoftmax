@@ -35,7 +35,7 @@ def loadLIBSVMdata(data_path):
 
 class Solver:
 
-	def __init__(self, data_path, hyper_param, repetitions, time_total, n_eval_loss, NS_n, OVE_n, IS_n, p2_scale):
+	def __init__(self, data_path, hyper_param, repetitions, time_total, n_eval_loss, NS_n, OVE_n, IS_n, p2_scale, alpha):
 
 		# Set hyperparameters
 		self.hyper_param = hyper_param
@@ -71,6 +71,7 @@ class Solver:
 		self.OVE_n = OVE_n
 		self.IS_n = IS_n
 		self.p2_scale = p2_scale
+		self.alpha = alpha
 		self.start_indices = randint(0,self.n_samples_train,repetitions)
 
 		self.parameter_save_name = "_hyper_%f_rep_%d_time_%d_n_eval_loss_%d_NS_n_%d_OVE_n_%d_p2_scale_%d_"%(hyper_param,repetitions,time_total,n_eval_loss,NS_n,OVE_n,p2_scale)+data_path[data_path.rfind("/")+1:]
@@ -103,7 +104,7 @@ class Solver:
 		elif method 	== 'IS_RB':		gradient_calculator = IS_RB(self.IS_n)
 		elif method 	== 'DNS':		gradient_calculator = DNS(self.NS_n, self.K, self.p2_scale)
 		elif method 	== 'DNS_nonRB':	gradient_calculator = DNS_nonRB(self.NS_n, self.K, self.p2_scale)
-		elif method 	== 'DOVE':		gradient_calculator = DOVE(self.OVE_n, self.K, self.p2_scale)
+		elif method 	== 'DOVE':		gradient_calculator = DOVE(self.OVE_n, self.K, self.p2_scale, self.alpha)
 		elif method 	== 'DOVE_nonRB':gradient_calculator = DOVE_nonRB(self.OVE_n, self.K, self.p2_scale)
 		elif method 	== 'DIS':		gradient_calculator = DIS(self.IS_n, self.K, self.p2_scale)
 		else:						raise ValueError('Not a valid method method.')
@@ -186,18 +187,19 @@ if __name__ == "__main__":
 	"../UnbiasedSoftmaxData/Simulated/simulated_data_K_1000_dim_2_n_datapoints_1000000_sigma_1"
 	"../UnbiasedSoftmaxData/LIBSVM/Delicious_data.txt"
 	"""
-	hyper_param = 0.1
-	repetitions = 5
+	hyper_param = 1.0
+	repetitions = 10
 	time_total = 10**5
 	n_eval_loss = 10
 	NS_n = 5
 	OVE_n = 5
 	IS_n = 30
 	p2_scale = 1
+	alpha = 0.01
 
 	# Create trainer class to run the Trains in
-	solver = Solver(data_path , hyper_param, repetitions , time_total, n_eval_loss, NS_n, OVE_n, IS_n, p2_scale)
-	for method in ['DIS','IS','EXACT']:#'scikit_learn','DOVE_nonRB','DNS_nonRB','DOVE','NS','DNS','IS','OVE','IS_RB',
+	solver = Solver(data_path , hyper_param, repetitions , time_total, n_eval_loss, NS_n, OVE_n, IS_n, p2_scale, alpha)
+	for method in ['DOVE','OVE','EXACT']:#'scikit_learn','DOVE_nonRB','DNS_nonRB','NS','DNS','IS','IS_RB','DIS','IS',
 		solver.fit(method)
 	solver.save_results()
 	solver.plot_results('Test')

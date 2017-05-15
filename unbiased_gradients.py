@@ -231,11 +231,13 @@ class DNS(gradient):
 			# Debiased gradient classes
 
 class DOVE(gradient):
-	def __init__(self, n, K, p2_scale):
+	def __init__(self, n, K, p2_scale, alpha):
 		self.n = n
 		self.K = K
-		self.p2 = p2_scale*sqrt(float(n)/K)#p2_scale*(float(n)/K)**(1.0/4)#0.5#
+		self.p2 = sqrt(float(1.0)/K)#p2_scale*sqrt(float(n)/K)#p2_scale*(float(n)/K)**(1.0/4)#0.5#
 		self.p2_counter = 0
+		self.alpha = alpha
+
 
 	def calculate_gradient(self, x,y,W):
 		self.p2_counter += self.p2
@@ -245,7 +247,7 @@ class DOVE(gradient):
 			self.p2_counter = 0
 			indices_EXACT , grad_EXACT , _ = EXACT_gradient(x,y,W)
 			grad_biased = RB_OVE_gradient(x,y,W,self.n)
-			grad = (grad_EXACT - grad_biased*(1-self.p2) ) / self.p2
+			grad = self.alpha*(grad_EXACT - grad_biased ) / self.p2 + grad_biased
 			return [indices_EXACT , grad, self.K]
 
 class DIS(gradient):
