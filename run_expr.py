@@ -111,7 +111,7 @@ class Solver:
 			elif method 	== 'IS_RB':		gradient_calculator = IS_RB(self.IS_n)
 			elif method 	== 'DNS':		gradient_calculator = DNS(self.NS_n, self.K, self.p2_scale, self.alpha, self.time_total)
 			elif method 	== 'DNS_nonRB':	gradient_calculator = DNS_nonRB(self.NS_n, self.K, self.p2_scale)
-			elif method 	== 'DOVE':		gradient_calculator = DOVE(self.OVE_n, self.K, self.p2_scale, self.alpha)
+			elif method 	== 'DOVE':		gradient_calculator = DOVE(self.OVE_n, self.K, self.p2_scale, self.alpha, self.time_total)
 			elif method 	== 'DOVE_nonRB':gradient_calculator = DOVE_nonRB(self.OVE_n, self.K, self.p2_scale)
 			elif method 	== 'DIS':		gradient_calculator = DIS(self.IS_n, self.K, self.p2_scale, self.alpha, self.time_total)
 			else:						raise ValueError('Not a valid method method.')
@@ -191,7 +191,7 @@ if __name__ == "__main__":
 	"../UnbiasedSoftmaxData/LIBSVM/Delicious_data.txt"
 	"""
 	hyper_param = 0.01
-	repetitions = 10
+	repetitions = 5
 	time_total = 10**8# 10**5/5 for alpha
 	n_eval_loss = 20
 	NS_n = 5
@@ -202,7 +202,7 @@ if __name__ == "__main__":
 
 	# Create trainer class to run the Trains in
 	solver = Solver(data_path , hyper_param, repetitions , time_total, n_eval_loss, NS_n, OVE_n, IS_n, p2_scale, alpha)
-	for method in ['DIS','DOVE','DNS','EXACT']:#'scikit_learn','DOVE_nonRB','DNS_nonRB','IS','IS_RB','IS','OVE','NS',
+	for method in ['DOVE']:#'scikit_learn','DOVE_nonRB','DNS_nonRB','IS','IS_RB','IS','OVE','NS','EXACT',,'DNS','DIS'
 		solver.fit(method)
 	solver.save_results()
 	solver.plot_results('Test')

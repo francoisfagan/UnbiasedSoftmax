@@ -46,7 +46,7 @@ def unpickle_data(data_path):
 	return method_scores
 
 if __name__ == "__main__":
-	data_path = "EXACT_DIS_hyper_0.010_rep_5_time_10000000_n_eval_loss_10_NS_n_5_OVE_n_5_p2_scale_1_alpha_1.00_Delicious_data.txt.p"
+	data_path = "DOVE_NS_EXACT_DNS_OVE_hyper_0.010000_rep_10_time_10000000_n_eval_loss_20_NS_n_5_OVE_n_5_p2_scale_1_Delicious_data.txt.p"
 	#"aDOVE_NS_EXACT_DNS_OVE_hyper_0.010000_rep_5_time_1000000_n_eval_loss_10_NS_n_5_OVE_n_5_p2_scale_1_eurlex_train.txt"
 	#"aDOVE_NS_EXACT_DNS_OVE_hyper_0.005000_rep_3_time_10000000_n_eval_loss_10_NS_n_5_OVE_n_5_p2_scale_1_Bibtex_data.txt"
 	#"aDOVE_NS_EXACT_DNS_OVE_hyper_0.010000_rep_3_time_10000000_n_eval_loss_10_NS_n_5_OVE_n_5_p2_scale_1_Delicious_data.txt"
@@ -55,9 +55,9 @@ if __name__ == "__main__":
 	test_or_train = "test"
 	method_scores = pickle.load( open( data_path, "rb" ) )
 
-	# data_path_updated = "IS_EXACT_DIS_hyper_0.010000_rep_10_time_10000000_n_eval_loss_10_NS_n_5_OVE_n_5_p2_scale_1_Delicious_data.txt.p"
-	# method_scores_updated = pickle.load( open( data_path_updated, "rb" ) )
-	# for method in ['IS','DIS',"EXACT"]:
-	# 	method_scores[method] = method_scores_updated[method]
+	data_path_updated = "DIS_hyper_0.010_rep_3_time_10000000_n_eval_loss_10_NS_n_5_OVE_n_5_p2_scale_1_alpha_1.00_Delicious_data.txt.p"
+	method_scores_updated = pickle.load( open( data_path_updated, "rb" ) )
+	for method in ['DIS']:#'IS',,"EXACT"
+		method_scores[method] = method_scores_updated[method]
 
 	plot_results(method_scores,test_or_train,data_path)

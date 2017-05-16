@@ -253,12 +253,14 @@ class DOVE(gradient):
 		alpha = min(self.alpha_initial * self.time / self.time_total,1.0)#self.alpha_initial #
 		self.p2_counter += alpha*self.p2
 		if self.p2_counter <= 1-self.p2 :
+			self.time += self.n
 			return OVE_gradient(x,y,W,self.n)
 		else :
+			self.time += self.K
 			self.p2_counter = 0
 			indices_EXACT , grad_EXACT , _ = EXACT_gradient(x,y,W)
 			grad_biased = RB_OVE_gradient(x,y,W,self.n)
-			grad = self.alpha*(grad_EXACT - grad_biased ) / self.p2 + grad_biased
+			grad = (grad_EXACT - grad_biased ) / self.p2 + grad_biased #alpha*
 			return [indices_EXACT , grad, self.K]
 
 class DIS(gradient):
@@ -279,8 +281,10 @@ class DIS(gradient):
 		alpha 			= min(self.alpha_initial * self.time / self.time_total,1.0)#self.alpha_initial #
 		self.p2_counter += alpha*self.p2
 		if self.p2_counter <= 1-self.p2 :
+			self.time += self.n
 			return IS_gradient(x,y,W,self.n, perm[:self.n]) #RB_
 		else :
+			self.time += self.K
 			self.p2_counter = 0
 			indices_EXACT , grad_EXACT , _ = EXACT_gradient(x,y,W)
 			grad_biased = RB_IS_gradient(x,y,W,self.n,perm)
