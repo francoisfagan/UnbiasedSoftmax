@@ -194,11 +194,14 @@ class IS_RB(gradient):
 # Debiased gradient classes
 
 class DNS(gradient):
-	def __init__(self, n, K, p2_scale):
+	def __init__(self, n, K, p2_scale, alpha, time_total):
 		self.n = n
 		self.K = K
 		self.p2 = p2_scale*sqrt(float(n)/K)
 		self.p2_counter = 0
+		self.alpha_initial = alpha
+		self.time_total = float(time_total)
+		self.time = 0.0
 
 		# Variables for updating n and p2 values
 		self.mean_EXACT_RB_difference = 0
@@ -206,41 +209,49 @@ class DNS(gradient):
 		self.mean_RB_norm = 0
 
 	def calculate_gradient(self, x,y,W):
-		self.p2_counter += self.p2
+		
+		alpha = min(self.alpha_initial * self.time / self.time_total,1.0)#self.alpha_initial #
+		self.p2_counter += alpha*self.p2
 		if self.p2_counter <= 1-self.p2 :
+			self.time += self.n
 			return NS_gradient(x,y,W,self.n)
 		else :
+			self.time += self.K
 			self.p2_counter = 0
 			indices_EXACT , grad_EXACT , _ = EXACT_gradient(x,y,W)
 			grad_biased = RB_NS_gradient(x,y,W,self.n)
 
-			# Update p2 variables
-			K = W.shape[0]
+			# # Update p2 variables
+			# K = W.shape[0]
 
-			# I HAVE REMOVED + FROM += BELOW
-			self.mean_EXACT_RB_difference += norm(grad_EXACT - grad_biased)**2 * norm(x)**2
-			self.mean_EXACT_RB_inner_product += grad_biased.dot(grad_EXACT-grad_biased) * norm(x)**2
-			self.mean_RB_norm += (grad_EXACT[y]**2 + (float(K)-1)/self.n * (norm(grad_biased[:y])**2 + norm(grad_biased[y+1:])**2)) * norm(x)**2
-			p2_new = self.mean_EXACT_RB_difference / (2*self.mean_EXACT_RB_inner_product + self.mean_RB_norm)
-			if random()<0.001:
-				print p2_new#*sqrt(float(self.n)/K)
+			# # I HAVE REMOVED + FROM += BELOW
+			# self.mean_EXACT_RB_difference += norm(grad_EXACT - grad_biased)**2 * norm(x)**2
+			# self.mean_EXACT_RB_inner_product += grad_biased.dot(grad_EXACT-grad_biased) * norm(x)**2
+			# self.mean_RB_norm += (grad_EXACT[y]**2 + (float(K)-1)/self.n * (norm(grad_biased[:y])**2 + norm(grad_biased[y+1:])**2)) * norm(x)**2
+			# p2_new = self.mean_EXACT_RB_difference / (2*self.mean_EXACT_RB_inner_product + self.mean_RB_norm)
+			# if random()<0.001:
+			# 	print p2_new#*sqrt(float(self.n)/K)
 
-			grad = (grad_EXACT - grad_biased*(1-self.p2) ) / self.p2
+			
+			grad = (grad_EXACT - grad_biased ) / self.p2 + grad_biased #alpha*
 			return [indices_EXACT , grad, self.K]
 
 			# Debiased gradient classes
 
 class DOVE(gradient):
-	def __init__(self, n, K, p2_scale, alpha):
+	def __init__(self, n, K, p2_scale, alpha, time_total):
 		self.n = n
 		self.K = K
 		self.p2 = sqrt(float(1.0)/K)#p2_scale*sqrt(float(n)/K)#p2_scale*(float(n)/K)**(1.0/4)#0.5#
 		self.p2_counter = 0
-		self.alpha = alpha
+		self.alpha_initial = alpha
+		self.time_total = float(time_total)
+		self.time = 0.0
 
 
 	def calculate_gradient(self, x,y,W):
-		self.p2_counter += self.p2
+		alpha = min(self.alpha_initial * self.time / self.time_total,1.0)#self.alpha_initial #
+		self.p2_counter += alpha*self.p2
 		if self.p2_counter <= 1-self.p2 :
 			return OVE_gradient(x,y,W,self.n)
 		else :
@@ -251,18 +262,22 @@ class DOVE(gradient):
 			return [indices_EXACT , grad, self.K]
 
 class DIS(gradient):
-	def __init__(self, n, K, p2_scale):
+	def __init__(self, n, K, p2_scale, alpha, time_total):
 		self.n = int(sqrt(K))
 		self.K = K
 		self.p2 = p2_scale*sqrt(1.0/K)
 		self.p2_counter = 0
 		self.p2_mean = 0.5
 		self.iteration_counter = 1
+		self.alpha_initial = alpha
+		self.time_total = float(time_total)
+		self.time = 0.0
 
 	def calculate_gradient(self, x,y,W):
 		K 				= W.shape[0]
 		perm 			= permutation(range(int(y)) + range(int(y)+1,K))
-		self.p2_counter += self.p2
+		alpha 			= min(self.alpha_initial * self.time / self.time_total,1.0)#self.alpha_initial #
+		self.p2_counter += alpha*self.p2
 		if self.p2_counter <= 1-self.p2 :
 			return IS_gradient(x,y,W,self.n, perm[:self.n]) #RB_
 		else :
@@ -280,32 +295,6 @@ class DIS(gradient):
 			return [indices_EXACT , grad, self.K]
 
 
-class PDIS(gradient):
-	def __init__(self, n, K, T):
-		self.n = int(sqrt(K))
-		self.K = K
-		self.T = T
-		self.t = 0.0
-		self.p2_counter = 0
-
-	def calculate_gradient(self, x,y,W):
-		self.t 			+= 1.0
-		alpha 			= self.t/self.T
-		self.n 			= int(max(sqrt(K),K*alpha))
-
-		K 				= W.shape[0]
-		perm 			= permutation(range(int(y)) + range(int(y)+1,K))
-
-		self.p2_counter += alpha
-		if self.p2_counter <= 1-alpha :
-			return IS_gradient(x,y,W,self.n, perm[:self.n]) #RB_
-		else :
-			self.p2_counter = np.mod(self.p2_counter,1.0)
-			indices_EXACT , grad_EXACT , _ = EXACT_gradient(x,y,W)
-			grad_biased = RB_IS_gradient(x,y,W,self.n,perm)
-			grad = grad_EXACT - grad_biased
-
-			return [indices_EXACT , grad, self.K]
 
 # Debiased gradient classes non-RB
 

@@ -1,5 +1,33 @@
 
-	# # Rao-Blackwellized importance sampling gradient
+	
+class PDIS(gradient):
+	def __init__(self, n, K, T):
+		self.n = int(sqrt(K))
+		self.K = K
+		self.T = T
+		self.t = 0.0
+		self.p2_counter = 0
+
+	def calculate_gradient(self, x,y,W):
+		self.t 			+= 1.0
+		alpha 			= self.t/self.T
+		self.n 			= int(max(sqrt(K),K*alpha))
+
+		K 				= W.shape[0]
+		perm 			= permutation(range(int(y)) + range(int(y)+1,K))
+
+		self.p2_counter += alpha
+		if self.p2_counter <= 1-alpha :
+			return IS_gradient(x,y,W,self.n, perm[:self.n]) #RB_
+		else :
+			self.p2_counter = np.mod(self.p2_counter,1.0)
+			indices_EXACT , grad_EXACT , _ = EXACT_gradient(x,y,W)
+			grad_biased = RB_IS_gradient(x,y,W,self.n,perm)
+			grad = grad_EXACT - grad_biased
+
+			return [indices_EXACT , grad, self.K]
+
+			# # Rao-Blackwellized importance sampling gradient
 	# K 				= W.shape[0]
 
 	# # Calculate inner products and denominator
