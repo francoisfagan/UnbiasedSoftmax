@@ -63,7 +63,7 @@ def OVE_gradient(x,y,W,n):
 	# Add y index and gradient
 	indices =  np.append( int(y), indices )
 	grad 	= np.append( -sum(grad) , grad )
-	return [ indices , grad , n ]
+	return [ indices , grad*K , n ]
 
 def IS_gradient(x,y,W,n,indices):
 	# Importance sampling gradient
@@ -120,7 +120,7 @@ def RB_OVE_gradient(x,y,W,n):
 	grad 	= - sigma( W.dot(x) - W[y,:].dot(x) )  / (K-1)
 	grad[y] = 0
 	grad[y] = - sum(grad)
-	return grad
+	return grad*K
 
 def RB_IS_gradient(x,y,W,n,perm):
 	# Rao-Blackwellized importance sampling gradient
@@ -250,7 +250,7 @@ class DOVE(gradient):
 
 
 	def calculate_gradient(self, x,y,W):
-		alpha = min(self.alpha_initial * self.time / self.time_total,1.0)#self.alpha_initial #
+		alpha = 1.0#min(self.alpha_initial * self.time / self.time_total,1.0)#self.alpha_initial #
 		self.p2_counter += alpha*self.p2
 		if self.p2_counter <= 1-self.p2 :
 			self.time += self.n

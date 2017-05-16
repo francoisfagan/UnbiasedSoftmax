@@ -184,25 +184,26 @@ class Solver:
 if __name__ == "__main__":
 	np.random.seed(1)
 
-	data_path = "../UnbiasedSoftmaxData/LIBSVM/Delicious_data.txt"
+	data_path = "../UnbiasedSoftmaxData/Simulated/simulated_data_K_100_dim_2_n_datapoints_100000"
 	"""
 	"../UnbiasedSoftmaxData/Simulated/simulated_data_K_100_dim_2_n_datapoints_100000"
 	"../UnbiasedSoftmaxData/Simulated/simulated_data_K_1000_dim_2_n_datapoints_1000000_sigma_1"
 	"../UnbiasedSoftmaxData/LIBSVM/Delicious_data.txt"
+	"../UnbiasedSoftmaxData/LIBSVM/Bibtex_data.txt"
 	"""
-	hyper_param = 0.01
-	repetitions = 5
-	time_total = 10**8# 10**5/5 for alpha
-	n_eval_loss = 20
+	hyper_param = 0.1
+	repetitions = 50
+	time_total = 10**5# 10**5/5 for alpha
+	n_eval_loss = 10
 	NS_n = 5
 	OVE_n = 5
-	IS_n = 30
+	IS_n = 10
 	p2_scale = 1
 	alpha = 1.0
 
 	# Create trainer class to run the Trains in
 	solver = Solver(data_path , hyper_param, repetitions , time_total, n_eval_loss, NS_n, OVE_n, IS_n, p2_scale, alpha)
-	for method in ['DOVE']:#'scikit_learn','DOVE_nonRB','DNS_nonRB','IS','IS_RB','IS','OVE','NS','EXACT',,'DNS','DIS'
+	for method in ['DOVE']:#'scikit_learn','DOVE_nonRB','DNS_nonRB','IS','IS_RB','OVE','NS',,'DIS','DIS''EXACT',
 		solver.fit(method)
 	solver.save_results()
 	solver.plot_results('Test')
