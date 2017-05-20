@@ -190,20 +190,21 @@ if __name__ == "__main__":
 	"../UnbiasedSoftmaxData/Simulated/simulated_data_K_1000_dim_2_n_datapoints_1000000_sigma_1"
 	"../UnbiasedSoftmaxData/LIBSVM/Delicious_data.txt"
 	"../UnbiasedSoftmaxData/LIBSVM/Bibtex_data.txt"
+	"../UnbiasedSoftmaxData/LIBSVM/eurlex_train.txt"
 	"""
 	hyper_param = 0.1
 	repetitions = 50
-	time_total = 10**5# 10**5/5 for alpha
-	n_eval_loss = 10
+	time_total = 10**5/5# 10**5/5 for alpha
+	n_eval_loss = 100
 	NS_n = 5
 	OVE_n = 5
-	IS_n = 10
+	IS_n = 60
 	p2_scale = 1
-	alpha = 1.0
+	alpha = 1.0 # The default is to linearly increase alpha so that alpha 0->1 over time with alpha=1 at t=T
 
 	# Create trainer class to run the Trains in
 	solver = Solver(data_path , hyper_param, repetitions , time_total, n_eval_loss, NS_n, OVE_n, IS_n, p2_scale, alpha)
-	for method in ['DOVE']:#'scikit_learn','DOVE_nonRB','DNS_nonRB','IS','IS_RB','OVE','NS',,'DIS','DIS''EXACT',
+	for method in ['NS','DNS','EXACT']:#'scikit_learn','DOVE_nonRB','DNS_nonRB','IS_RB','OVE',,'NS',,,,'IS','EXACT','DIS','DOVE'
 		solver.fit(method)
 	solver.save_results()
 	solver.plot_results('Test')
